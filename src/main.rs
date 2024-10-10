@@ -38,7 +38,7 @@ fn main() {
             "bp" => println!("{}", bp(&mut input, &conn)),
             "mood" => println!("{}", mood(&mut input, &conn)),
             "stat" => println!("{}", stat(&mut input, &conn)),
-            "ingest_markdown_weight" => read_markdown_weight(&mut input, &conn),
+            "ingest_markdown_weight" => ingest_markdown_weight(&mut input, &conn),
             "q" => running = false,
             _ => println!("Unknown command: {}", command)
         }
@@ -51,7 +51,8 @@ fn help() -> String {
         \tweight <weight:f64>\n
         \tbp <sys:i64> <dia:i64>\n
         \tmood <mood:str>\n
-        \tstat <command:str> <query:str>\n
+        \tstat <command:str> <\"last\">\n
+        \tingest_markdown_weight <file_path:str>
         \tq -> exit
     ")
 }
@@ -217,7 +218,7 @@ fn format_timestamp(timestamp: i64) -> String {
     Utc.timestamp_opt(timestamp, 0).unwrap().to_rfc3339()
 }
 
-fn read_markdown_weight(input: &mut SplitWhitespace, conn: &Connection) {
+fn ingest_markdown_weight(input: &mut SplitWhitespace, conn: &Connection) {
     let file = match input.next() {
         Some(file) => file,
         None => return
