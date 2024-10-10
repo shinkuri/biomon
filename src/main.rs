@@ -1,4 +1,4 @@
-use std::{io, str::SplitWhitespace};
+use std::{fs, io, str::SplitWhitespace};
 use chrono::{TimeZone, Utc};
 use rusqlite::{params, Connection};
 
@@ -38,6 +38,7 @@ fn main() {
             "bp" => println!("{}", bp(&mut input, &conn)),
             "mood" => println!("{}", mood(&mut input, &conn)),
             "stat" => println!("{}", stat(&mut input, &conn)),
+            "ingest_markdown_weight" => read_markdown_weight(&mut input, &conn),
             "q" => running = false,
             _ => println!("Unknown command: {}", command)
         }
@@ -56,7 +57,7 @@ fn help() -> String {
 }
 
 struct Weight {
-    id: i32,
+    _id: i32,
     timestamp: i64,
     weight: f64
 }
@@ -147,7 +148,7 @@ fn stat_weight(input: &mut SplitWhitespace, conn: &Connection) -> String {
     
     match query_command {
         "last" => {
-            let take = 10;
+            let take = 1000;
             
             let mut query = conn.prepare("
                 SELECT id, timestamp, weight
@@ -159,7 +160,7 @@ fn stat_weight(input: &mut SplitWhitespace, conn: &Connection) -> String {
             
             let results = query.query_map([take], |row| {
                 Ok(Weight {
-                    id: row.get(0)?,
+                    _id: row.get(0)?,
                     timestamp: row.get(1)?,
                     weight: row.get(2)?
                 })
@@ -214,4 +215,53 @@ fn create_tables(conn: &Connection) {
 
 fn format_timestamp(timestamp: i64) -> String {
     Utc.timestamp_opt(timestamp, 0).unwrap().to_rfc3339()
+}
+
+fn read_markdown_weight(input: &mut SplitWhitespace, conn: &Connection) {
+    let file = match input.next() {
+        Some(file) => file,
+        None => return
+    };
+
+    let contents = fs::read_to_string(file).unwrap();
+
+    for line in contents.lines() {
+        // - 2023-12-03: 105.4kg
+        let line = line.replace("- ", "");
+        // 2023-12-03: 105.4kg
+        let mut parts = line.split(':');
+        // ["2023-12-03", " 105.4kg"]
+        let date = match parts.next() {
+            Some(date) => date,
+            None => continue
+        };
+        let mut date_parts = date.split('-');
+        let year = match date_parts.next() {
+            Some(year) => year.parse().unwrap(),
+            None => continue
+        };
+        let month = match date_parts.next() {
+            Some(month) => month.parse().unwrap(),
+            None => continue
+        };
+        let day = match date_parts.next() {
+            Some(day) => day.parse().unwrap(),
+            None => continue
+        };
+        // assume measurements were taken at 09:00
+        let timestamp = Utc.with_ymd_and_hms(year, month, day, 9, 0, 0).unwrap().timestamp();
+        
+        let weight = match parts.next() {
+            Some(weight) => weight.trim().replace("kg", ""),
+            None => continue
+        };
+
+        conn.execute(
+            "INSERT INTO weight (timestamp, weight) VALUES (?1, ?2);",
+            params![timestamp, weight]
+        )
+        .expect("Failed to persist weight data");
+    
+        println!("Recorded weight: {}kg", weight)
+    }
 }
