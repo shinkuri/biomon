@@ -115,16 +115,16 @@ fn ingest_markdown_weight(input: &mut SplitWhitespace, conn: &Connection) {
             None => continue
         };
         let mut date_parts = date.split('-');
-        let year = match date_parts.next() {
-            Some(year) => year.parse().unwrap(),
+        let year = match date_parts.next().and_then(|year| year.parse::<i32>().ok()) {
+            Some(year) => year,
             None => continue
         };
-        let month = match date_parts.next() {
-            Some(month) => month.parse().unwrap(),
+        let month = match date_parts.next().and_then(|month| month.parse::<u32>().ok()) {
+            Some(month) => month,
             None => continue
         };
-        let day = match date_parts.next() {
-            Some(day) => day.parse().unwrap(),
+        let day = match date_parts.next().and_then(|day| day.parse::<u32>().ok()) {
+            Some(day) => day,
             None => continue
         };
         // assume measurements were taken at 09:00
