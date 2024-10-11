@@ -35,6 +35,10 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - x86_64-pc-windows-gnu
     steps:
       - name: Download artifact
         uses: actions/download-artifact@v3
