@@ -40,10 +40,10 @@ impl Stat for BP {
             Err(e) => return format!("Failed to parse parameter: {}", e)
         };
     
-        let utc_unix_time = Utc::now().timestamp();
+        let timestamp = Utc::now().timestamp();
         conn.execute(
             "INSERT INTO bp (timestamp, sys, dia) VALUES (?1, ?2, ?3);",
-            params![utc_unix_time, sys, dia]
+            params![timestamp, sys, dia]
         )
         .expect("Failed to persist bp data");
     

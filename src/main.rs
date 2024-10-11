@@ -1,6 +1,7 @@
 use std::{fs, io, str::SplitWhitespace};
 use bp::BP;
 use chrono::{TimeZone, Utc};
+use heartrate::Heartrate;
 use mood::Mood;
 use rusqlite::{params, Connection};
 use weight::Weight;
@@ -8,6 +9,7 @@ use weight::Weight;
 mod weight;
 mod bp;
 mod mood;
+mod heartrate;
 mod utils;
 
 pub trait Stat {
@@ -51,6 +53,7 @@ fn main() {
             "weight" => println!("{}", Weight::command(&mut input, &conn)),
             "bp" => println!("{}", BP::command(&mut input, &conn)),
             "mood" => println!("{}", Mood::command(&mut input, &conn)),
+            "heartrate" => println!("{}", Heartrate::command(&mut input, &conn)),
             "stat" => println!("{}", stat(&mut input, &conn)),
             "ingest_markdown_weight" => ingest_markdown_weight(&mut input, &conn),
             "q" => running = false,
@@ -64,6 +67,7 @@ fn create_tables(conn: &Connection) {
     Weight::tables(conn);
     BP::tables(conn);
     Mood::tables(conn);
+    Heartrate::tables(conn);
 }
 
 fn help() -> String {
@@ -72,6 +76,7 @@ fn help() -> String {
     help.push_str(&Weight::help());
     help.push_str(&BP::help());
     help.push_str(&Mood::help());
+    help.push_str(&Heartrate::help());
     help.push_str("\tstat <command:str> <\"last\">\n");
     help.push_str("\tingest_markdown_weight <file_path:str>");
     help.push_str("\tq -> exit");

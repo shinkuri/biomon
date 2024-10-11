@@ -26,10 +26,10 @@ impl Stat for Mood {
             None => return String::from("Failed to extract parameter")
         };
     
-        let utc_unix_time = Utc::now().timestamp();
+        let timestamp = Utc::now().timestamp();
         conn.execute(
             "INSERT INTO mood (timestamp, mood) VALUES (?1, ?2);",
-            params![utc_unix_time, mood]
+            params![timestamp, mood]
         )
         .expect("Failed to persist bp data");
     

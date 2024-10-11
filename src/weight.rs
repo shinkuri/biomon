@@ -37,10 +37,10 @@ impl Stat for Weight {
             Err(e) => return format!("Failed to parse parameter: {}", e)
         };
     
-        let utc_unix_time = Utc::now().timestamp();
+        let timestamp = Utc::now().timestamp();
         conn.execute(
             "INSERT INTO weight (timestamp, weight) VALUES (?1, ?2);",
-            params![utc_unix_time, weight]
+            params![timestamp, weight]
         )
         .expect("Failed to persist weight data");
     
