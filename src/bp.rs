@@ -31,11 +31,11 @@ impl Stat for BP {
             None => return String::from("Failed to extract parameter: dia")
         };
     
-        let sys: i64 = match sys.parse() {
+        let sys = match sys.parse::<i64>() {
             Ok(sys) => sys,
             Err(e) => return format!("Failed to parse parameter: {}", e)
         };
-        let dia: i64 = match dia.parse() {
+        let dia = match dia.parse::<i64>() {
             Ok(dia) => dia,
             Err(e) => return format!("Failed to parse parameter: {}", e)
         };

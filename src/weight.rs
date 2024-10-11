@@ -32,7 +32,7 @@ impl Stat for Weight {
             None => return String::from("Failed to extract parameter")
         };
     
-        let weight: f64 = match weight.parse() {
+        let weight = match weight.parse::<f64>() {
             Ok(weight) => weight,
             Err(e) => return format!("Failed to parse parameter: {}", e)
         };
@@ -66,7 +66,7 @@ pub fn stat_weight(input: &mut SplitWhitespace, conn: &Connection) -> String {
         "last" => {
             let take_default = 10;
             let take = match query_param {
-                Some(take) => take.parse().unwrap_or_else(|_| {
+                Some(take) => take.parse::<i32>().unwrap_or_else(|_| {
                     output.push_str("Failed to parse query parameter\nUsing default query parameter\n");
                     take_default
                 }),

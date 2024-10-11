@@ -26,7 +26,7 @@ impl Stat for Heartrate {
             None => return String::from("Failed to extract parameter")
         };
     
-        let heartrate: i64 = match heartrate.parse() {
+        let heartrate = match heartrate.parse::<i64>() {
             Ok(heartrate) => heartrate,
             Err(e) => return format!("Failed to parse parameter: {}", e)
         };
