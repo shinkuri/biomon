@@ -47,13 +47,13 @@ jobs:
           path: .
       
       - name: List
-        run: ls -alh .
+        run: ls -alh /home/runner/work/biomon/biomon
 
       - name: Create release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref }}
-          files: biomon-${{ matrix.target }}.exe
+          files: /home/runner/work/biomon/biomon/biomon-${{ matrix.target }}.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   
