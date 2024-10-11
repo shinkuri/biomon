@@ -30,7 +30,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: biomon-${{ matrix.target }}.exe
-          path: target/${{ matrix.target }}/release/biomon
+          path: target/${{ matrix.target }}/release/biomon.exe
 
   release:
     needs: build
