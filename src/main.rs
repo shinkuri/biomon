@@ -1,6 +1,20 @@
 use std::{fs, io, str::SplitWhitespace};
+use bp::BP;
 use chrono::{TimeZone, Utc};
+use mood::Mood;
 use rusqlite::{params, Connection};
+use weight::Weight;
+
+mod weight;
+mod bp;
+mod mood;
+mod utils;
+
+pub trait Stat {
+    fn tables(conn: &Connection);
+    fn command(input: &mut SplitWhitespace, conn: &Connection) -> String;
+    fn help() -> String;
+}
 
 fn main() {
     let conn = Connection::open("biomon.sqlite")
@@ -34,9 +48,9 @@ fn main() {
         // Match against the input string
         match command {
             "help" => println!("{}", help()),
-            "weight" => println!("{}", weight(&mut input, &conn)),
-            "bp" => println!("{}", bp(&mut input, &conn)),
-            "mood" => println!("{}", mood(&mut input, &conn)),
+            "weight" => println!("{}", Weight::command(&mut input, &conn)),
+            "bp" => println!("{}", BP::command(&mut input, &conn)),
+            "mood" => println!("{}", Mood::command(&mut input, &conn)),
             "stat" => println!("{}", stat(&mut input, &conn)),
             "ingest_markdown_weight" => ingest_markdown_weight(&mut input, &conn),
             "q" => running = false,
@@ -46,87 +60,23 @@ fn main() {
 
 }
 
+fn create_tables(conn: &Connection) {
+    Weight::tables(conn);
+    BP::tables(conn);
+    Mood::tables(conn);
+}
+
 fn help() -> String {
-    String::from("List of commands: \n
-        \tweight <weight:f64>\n
-        \tbp <sys:i64> <dia:i64>\n
-        \tmood <mood:str>\n
-        \tstat <command:str> <\"last\">\n
-        \tingest_markdown_weight <file_path:str>
-        \tq -> exit
-    ")
-}
-
-struct Weight {
-    _id: i32,
-    timestamp: i64,
-    weight: f64
-}
-
-fn weight(input: &mut SplitWhitespace, conn: &Connection) -> String {
-    let weight = match input.next() {
-        Some(weight) => weight,
-        None => return String::from("Failed to extract parameter")
-    };
-
-    let weight: f64 = match weight.parse() {
-        Ok(weight) => weight,
-        Err(e) => return format!("Failed to parse parameter: {}", e)
-    };
-
-    let utc_unix_time = Utc::now().timestamp();
-    conn.execute(
-        "INSERT INTO weight (timestamp, weight) VALUES (?1, ?2);",
-        params![utc_unix_time, weight]
-    )
-    .expect("Failed to persist weight data");
-
-    format!("Recorded weight: {}kg", weight)
-}
-
-fn bp(input: &mut SplitWhitespace, conn: &Connection) -> String {
-    let sys = match input.next() {
-        Some(sys) => sys,
-        None => return String::from("Failed to extract parameter: sys")
-    };
-    let dia = match input.next() {
-        Some(dia) => dia,
-        None => return String::from("Failed to extract parameter: dia")
-    };
-
-    let sys: i64 = match sys.parse() {
-        Ok(sys) => sys,
-        Err(e) => return format!("Failed to parse parameter: {}", e)
-    };
-    let dia: i64 = match dia.parse() {
-        Ok(dia) => dia,
-        Err(e) => return format!("Failed to parse parameter: {}", e)
-    };
-
-    let utc_unix_time = Utc::now().timestamp();
-    conn.execute(
-        "INSERT INTO bp (timestamp, sys, dia) VALUES (?1, ?2, ?3);",
-        params![utc_unix_time, sys, dia]
-    )
-    .expect("Failed to persist bp data");
-
-    format!("Recorded bp: systolic {}mmHg, diastolic {}mmHg", sys, dia)
-}
-
-fn mood(input: &mut SplitWhitespace, conn: &Connection) -> String {
-    let mood = match input.next() {
-        Some(mood) => mood,
-        None => return String::from("Failed to extract parameter")
-    };
-
-    let utc_unix_time = Utc::now().timestamp();
-    conn.execute(
-        "INSERT INTO mood (timestamp, mood) VALUES (?1, ?2);",
-        params![utc_unix_time, mood]
-    )
-    .expect("Failed to persist bp data");
-
-    format!("Recorded mood: {}", mood)
+    let mut help = String::new();
+    help.push_str("List of commands:\n");
+    help.push_str(&Weight::help());
+    help.push_str(&BP::help());
+    help.push_str(&Mood::help());
+    help.push_str("\tstat <command:str> <\"last\">\n");
+    help.push_str("\tingest_markdown_weight <file_path:str>");
+    help.push_str("\tq -> exit");
+    
+    help
 }
 
 fn stat(input: &mut SplitWhitespace, conn: &Connection) -> String {
@@ -136,86 +86,9 @@ fn stat(input: &mut SplitWhitespace, conn: &Connection) -> String {
     };
 
     match sub_command {
-        "weight" => stat_weight(input, conn),
+        "weight" => weight::stat_weight(input, conn),
         _ => format!("Unknown stat command: {}", sub_command)
     }
-}
-
-fn stat_weight(input: &mut SplitWhitespace, conn: &Connection) -> String {
-    let query_command = match input.next() {
-        Some(query_command) => query_command,
-        None => return String::from("Failed to extract query command")
-    };
-    
-    match query_command {
-        "last" => {
-            let take = 1000;
-            
-            let mut query = conn.prepare("
-                SELECT id, timestamp, weight
-                FROM weight
-                ORDER BY timestamp DESC
-                LIMIT (?1);
-            ")
-            .expect("Failed to prepare query last");
-            
-            let results = query.query_map([take], |row| {
-                Ok(Weight {
-                    _id: row.get(0)?,
-                    timestamp: row.get(1)?,
-                    weight: row.get(2)?
-                })
-            });
-            
-            match results {
-                Ok(results) => {
-                    let mut records = String::new();
-                    for result in results {
-                        let result = result.unwrap();
-                        records.push_str(&format!("{}kg, recorded {}\n", result.weight, format_timestamp(result.timestamp)));
-                    }
-                    records
-                },
-                Err(err) => format!("Failed to retrieve last {} weights: {}", take, err)
-            }
-        },
-        _ => format!("Unknown query command: {}", query_command)
-    }
-}
-
-fn create_tables(conn: &Connection) {
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS weight (
-                id          INTEGER PRIMARY KEY,
-                timestamp   INTEGER NOT NULL,
-                weight      REAL NOT NULL
-            );", 
-        [],
-    )
-    .expect("Failed to ensure table 'weight' exists");
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS bp (
-                id          INTEGER PRIMARY KEY,
-                timestamp   INTEGER NOT NULL,
-                sys         INTEGER NOT NULL,
-                dia         INTEGER NOT NULL
-            );", 
-        [],
-    )
-    .expect("Failed to ensure table 'bp' exists");
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS mood (
-                id          INTEGER PRIMARY KEY,
-                timestamp   INTEGER NOT NULL,
-                mood        TEXT NOT NULL
-            );", 
-        [],
-    )
-    .expect("Failed to ensure table 'mood' exists");
-}
-
-fn format_timestamp(timestamp: i64) -> String {
-    Utc.timestamp_opt(timestamp, 0).unwrap().to_rfc3339()
 }
 
 fn ingest_markdown_weight(input: &mut SplitWhitespace, conn: &Connection) {
