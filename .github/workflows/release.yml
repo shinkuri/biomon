@@ -24,10 +24,15 @@ jobs:
       - name: Build project
         run: cargo build --release --target ${{ matrix.target }}
       
+      - name: Create ZIP archive
+        run: |
+          cd target/release
+          zip biomon.zip biomon sqlite3.dll
+
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: biomon-${{ matrix.target }}
+          name: biomon-${{ matrix.target }}.zip
           path: target/${{ matrix.target }}/release/biomon
 
   release:
