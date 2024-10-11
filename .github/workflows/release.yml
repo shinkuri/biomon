@@ -46,9 +46,13 @@ jobs:
           name: biomon-${{ matrix.target }}.exe
           path: .
       
+      - name: List
+        run: ls -alh .
+
       - name: Create release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ github.ref }}
           files: biomon-${{ matrix.target }}.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
