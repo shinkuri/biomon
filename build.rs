@@ -1,13 +1,22 @@
-use std::fs;
+use std::{env, fs};
 use std::path::Path;
 
 fn main() {
-    // copy sqlite files to build output
-    let dll = "sqlite3.dll";
-    let def = "sqlite3.def";
-    let out_dir = &std::env::var("OUT_DIR").unwrap();
-    let dest = Path::new(&out_dir);
+    let out_dir = env::var("OUT_DIR").unwrap();
+    let target = env::var("CARGO_CFG_TARGET_OS").unwrap();
 
-    fs::copy(dll, dest.join(dll)).expect("Failed to copy sqlite.dll to output directory");
-    fs::copy(def, dest.join(def)).expect("Failed to copy sqlite.def to output directory");
+    let windows_sqlite = "sqlite3.dll";
+    // let linux_sqlite = "sqlite3";
+
+    let sqlite_source = match target.as_str() {
+        "windows" => windows_sqlite,
+        // "linux" => linux_sqlite,
+        // "macos" => 
+        _ => panic!("Unsupported target platform")
+    };
+
+    // copy sqlite files to build output
+    let dest_path = Path::new(&out_dir);
+    fs::copy(sqlite_source, dest_path.join(sqlite_source))
+        .unwrap_or_else(|_| panic!("Failed to copy sqlite to output directory for target {}", target));
 }
