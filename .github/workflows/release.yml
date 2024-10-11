@@ -53,7 +53,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref }}
-          files: /home/runner/work/biomon/biomon/biomon-${{ matrix.target }}.exe
+          files: /home/runner/work/biomon/biomon/biomon.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   
