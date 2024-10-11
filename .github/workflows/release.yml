@@ -26,19 +26,10 @@ jobs:
       - name: Build project
         run: cargo build --release --target ${{ matrix.target }}
       
-      - name: Create ZIP archive
-        run: |
-          cd target/release
-          if [[ "${{ matrix.target }}" == "x86_64-unknown-linux-gnu" ]]; then
-            zip biomon.zip biomon sqlite3
-          elif [[ "${{ matrix.target }}" == "x86_64-pc-windows-gnu" ]]; then
-            zip biomon.zip biomon.exe sqlite3.dll
-          fi
-
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: biomon-${{ matrix.target }}.zip
+          name: biomon-${{ matrix.target }}.exe
           path: target/${{ matrix.target }}/release/biomon
 
   release:
@@ -48,13 +39,13 @@ jobs:
       - name: Download artifact
         uses: actions/download-artifact@v3
         with:
-          name: biomon-${{ matrix.target }}.zip
+          name: biomon-${{ matrix.target }}.exe
           path: .
       
       - name: Create release
         uses: softprops/action-gh-release@v1
         with:
-          files: biomon-${{ matrix.target }}.zip
+          files: biomon-${{ matrix.target }}.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   
