@@ -53,14 +53,28 @@ impl Stat for Weight {
 }
 
 pub fn stat_weight(input: &mut SplitWhitespace, conn: &Connection) -> String {
+    let mut output = String::new();
+
     let query_command = match input.next() {
         Some(query_command) => query_command,
         None => return String::from("Failed to extract query command")
     };
+
+    let query_param = input.next();
     
     match query_command {
         "last" => {
-            let take = 1000;
+            let take_default = 10;
+            let take = match query_param {
+                Some(take) => take.parse().unwrap_or_else(|_| {
+                    output.push_str("Failed to parse query parameter\nUsing default query parameter\n");
+                    take_default
+                }),
+                None => {
+                    output.push_str("Using default query parameter\n");
+                    take_default
+                }
+            };
             
             let mut query = conn.prepare("
                 SELECT id, timestamp, weight
