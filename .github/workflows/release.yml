@@ -33,6 +33,7 @@ jobs:
             zip biomon.zip biomon sqlite3
           elif [[ "${{ matrix.target }}" == "x86_64-pc-windows-gnu" ]]; then
             zip biomon.zip biomon.exe sqlite3.dll
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
