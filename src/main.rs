@@ -20,10 +20,9 @@ pub trait Stat {
 
 fn main() {
     let conn = Connection::open("biomon.sqlite")
-        .expect("Failed to open biomon.sqlite");
+        .expect("Failed to open ./biomon.sqlite");
     create_tables(&conn);
 
-    println!("Hello Shinkuri!");
     println!("NOTE: Commonly used unit are implied for all entered data.");
     println!("NOTE: Enter 'help' to see help");
 
@@ -37,7 +36,6 @@ fn main() {
             .read_line(&mut input)
             .expect("Failed to read input");
     
-        // Trim the input to remove any newline or spaces
         let mut input = input.split_whitespace();
     
         let command = match input.next() {
@@ -76,7 +74,7 @@ fn help() -> String {
     help.push_str(&BP::help());
     help.push_str(&Mood::help());
     help.push_str(&Heartrate::help());
-    help.push_str("\tingest_markdown_weight <file_path:str>");
+    help.push_str("\tingest_markdown_weight <file_path:str>\n");
     help.push_str("\tq -> exit");
     
     help

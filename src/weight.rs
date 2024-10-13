@@ -6,7 +6,7 @@ use rusqlite::{params, Connection};
 use crate::{utils, Stat};
 
 struct WeightORM {
-    _id: i32,
+    _id: i64,
     timestamp: i64,
     weight: f64
 }
@@ -62,7 +62,7 @@ fn last(input: &mut SplitWhitespace, conn: &Connection) -> String {
     
     let take_default = 3;
     let take = match input.next() {
-        Some(take) => take.parse::<i32>().unwrap_or_else(|_| {
+        Some(take) => take.parse::<i64>().unwrap_or_else(|_| {
             output.push_str(&format!("Failed to parse query parameter\nUsing default query parameter {}\n", take_default));
             take_default
         }),
@@ -95,7 +95,7 @@ fn last(input: &mut SplitWhitespace, conn: &Connection) -> String {
                 output.push_str(&format!("{}kg, recorded {}\n", result.weight, utils::format_timestamp(result.timestamp)));
             }
         },
-        Err(err) => output.push_str(&format!("Failed to retrieve last {} weights: {}", take, err)),
+        Err(err) => output.push_str(&format!("Failed to retrieve last {} entries: {}", take, err)),
     }
 
     output
