@@ -54,7 +54,6 @@ fn main() {
             "bp" => println!("{}", BP::command(&mut input, &conn)),
             "mood" => println!("{}", Mood::command(&mut input, &conn)),
             "heartrate" => println!("{}", Heartrate::command(&mut input, &conn)),
-            "stat" => println!("{}", stat(&mut input, &conn)),
             "ingest_markdown_weight" => ingest_markdown_weight(&mut input, &conn),
             "q" => running = false,
             _ => println!("Unknown command: {}", command)
@@ -77,23 +76,10 @@ fn help() -> String {
     help.push_str(&BP::help());
     help.push_str(&Mood::help());
     help.push_str(&Heartrate::help());
-    help.push_str("\tstat <command:str> <\"last\">\n");
     help.push_str("\tingest_markdown_weight <file_path:str>");
     help.push_str("\tq -> exit");
     
     help
-}
-
-fn stat(input: &mut SplitWhitespace, conn: &Connection) -> String {
-    let sub_command = match input.next() {
-        Some(sub_command) => sub_command,
-        None => return String::from("Failed to extract sub command")
-    };
-
-    match sub_command {
-        "weight" => weight::stat_weight(input, conn),
-        _ => format!("Unknown stat command: {}", sub_command)
-    }
 }
 
 fn ingest_markdown_weight(input: &mut SplitWhitespace, conn: &Connection) {
