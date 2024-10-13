@@ -18,16 +18,33 @@ pub trait Stat {
     fn help() -> String;
 }
 
-fn main() {
-    let conn = Connection::open("biomon.sqlite")
-        .expect("Failed to open ./biomon.sqlite");
+fn main() {    
+    let conn = match Connection::open("biomon.sqlite") {
+        Ok(conn) => conn,
+        Err(_) => {
+            println!("Failed to open ./biomon.sqlite (Missing permissions?)");
+            println!("Cannot proceed without database");
+            println!("'q' to exit");
+            
+            let mut input = String::new();
+            while !input.starts_with('q') {
+                // Wait for user input
+                io::stdin()
+                .read_line(&mut input)
+                .expect("Failed to read input");
+            }
+
+            return
+        }
+    };
+
     create_tables(&conn);
 
     println!("NOTE: Commonly used unit are implied for all entered data.");
     println!("NOTE: Enter 'help' to see help");
 
     let mut running = true;
-
+    
     while running {
         let mut input = String::new();
     

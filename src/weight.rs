@@ -95,7 +95,7 @@ fn last(input: &mut SplitWhitespace, conn: &Connection) -> String {
                 output.push_str(&format!("{}kg, recorded {}\n", result.weight, utils::format_timestamp(result.timestamp)));
             }
         },
-        Err(err) => output.push_str(&format!("Failed to retrieve last {} entries: {}", take, err)),
+        Err(err) => output.push_str(&format!("Failed to retrieve last {} entries: {}\n", take, err)),
     }
 
     output
