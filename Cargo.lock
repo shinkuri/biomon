@@ -82,8 +82,10 @@ version = "0.1.0"
 dependencies = [
  "btleplug",
  "chrono",
+ "fern",
  "futures",
  "ini",
+ "log",
  "rusqlite",
  "tokio",
  "uuid",
@@ -304,6 +306,15 @@ name = "fallible-streaming-iterator"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
+
+[[package]]
+name = "fern"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9f0c14694cbd524c8720dd69b0e3179344f04ebb5f90f2e4a440c6ea3b2f1ee"
+dependencies = [
+ "log",
+]
 
 [[package]]
 name = "futures"
