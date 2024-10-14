@@ -1,17 +1,20 @@
-use std::{fs, io, str::SplitWhitespace, time::Duration};
 use bp::BP;
 use chrono::{TimeZone, Utc};
+use fern::Dispatch;
 use heartrate::Heartrate;
-use ini::configparser::ini::Ini;
+use std::{fs, io, str::SplitWhitespace, time::Duration};
+
+use log::info;
 use mood::Mood;
-use rusqlite::{backup::{Backup}, params, Connection};
+use rusqlite::{backup::Backup, params, Connection};
 use weight::Weight;
 
-mod weight;
+mod ble_hrp;
 mod bp;
-mod mood;
 mod heartrate;
+mod mood;
 mod utils;
+mod weight;
 
 pub trait Stat {
     fn tables(conn: &Connection);
@@ -19,23 +22,28 @@ pub trait Stat {
     fn help() -> String;
 }
 
-fn main() {    
+#[tokio::main]
+async fn main() {
+    setup_logger().expect("Failed to setup logger");
+    info!("Biomon launched");
+    let _p = ble_hrp::identify_device("C2:7A:75:27:F7:3E", ble_hrp::scan().await).await;
+
     let conn = match Connection::open("biomon.sqlite") {
         Ok(conn) => conn,
         Err(_) => {
             println!("Failed to open ./biomon.sqlite (Missing permissions?)");
             println!("Cannot proceed without database");
             println!("'q' to exit");
-            
+
             let mut input = String::new();
             while !input.starts_with('q') {
                 // Wait for user input
                 io::stdin()
-                .read_line(&mut input)
-                .expect("Failed to read input");
+                    .read_line(&mut input)
+                    .expect("Failed to read input");
             }
 
-            return
+            return;
         }
     };
 
@@ -45,17 +53,17 @@ fn main() {
     println!("NOTE: Enter 'help' to see help");
 
     let mut running = true;
-    
+
     while running {
         let mut input = String::new();
-    
+
         // Wait for user input
         io::stdin()
             .read_line(&mut input)
             .expect("Failed to read input");
-    
+
         let mut input = input.split_whitespace();
-    
+
         let command = match input.next() {
             Some(command) => command,
             None => {
@@ -73,24 +81,27 @@ fn main() {
             "ingest_markdown_weight" => ingest_markdown_weight(&mut input, &conn),
             "backup" => println!("{}", backup(&mut input, &conn)),
             "q" => running = false,
-            _ => println!("Unknown command: {}", command)
+            _ => println!("Unknown command: {}", command),
         }
     }
-
-    drop(conn);
 }
 
-fn write_ini() -> Result<(), io::Error>{
-    let mut ini = Ini::new();
-
-    ini.set("General", "user", None);
-
-    ini.write("config.ini")
-}
-
-fn read_ini() {
-    let mut ini = Ini::new();
-    let ini = ini.load("config.ini");
+fn setup_logger() -> Result<(), Box<dyn std::error::Error>> {
+    Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{}[{}][{}] {}",
+                Utc::now().format("[%Y-%m-%d %H:%M:%S]"),
+                record.level(),
+                record.target(),
+                message
+            ))
+        })
+        .level(log::LevelFilter::Info) // Set default level
+        .chain(std::io::stdout()) // Output to stdout
+        .chain(fern::log_file("biomon.log")?)
+        .apply()?;
+    Ok(())
 }
 
 fn create_tables(conn: &Connection) {
@@ -110,36 +121,36 @@ fn help() -> String {
     help.push_str("\tingest_markdown_weight <file_path:str>\n");
     help.push_str("\tbackup <backup_path:str>");
     help.push_str("\tq -> exit");
-    
+
     help
 }
 
 fn backup(input: &mut SplitWhitespace, conn: &Connection) -> String {
     let path = match input.next() {
         Some(param) => param,
-        None => return String::from("Missing destination path")
+        None => return String::from("Missing destination path"),
     };
 
     let mut backup_conn = match Connection::open(path) {
         Ok(backup_conn) => backup_conn,
-        Err(e) => return format!("Failed to create/open backup target\n{}", e)
+        Err(e) => return format!("Failed to create/open backup target\n{}", e),
     };
 
     let backup = match Backup::new(conn, &mut backup_conn) {
         Ok(backup) => backup,
-        Err(e) => return format!("Failed to initialize backup\n{}", e)
+        Err(e) => return format!("Failed to initialize backup\n{}", e),
     };
-    
+
     match backup.run_to_completion(5, Duration::from_millis(250), None) {
         Ok(_) => String::from("backup done"),
-        Err(_) => String::from("backup failed")
+        Err(_) => String::from("backup failed"),
     }
 }
 
 fn ingest_markdown_weight(input: &mut SplitWhitespace, conn: &Connection) {
     let file = match input.next() {
         Some(file) => file,
-        None => return
+        None => return,
     };
 
     let contents = fs::read_to_string(file).unwrap();
@@ -152,35 +163,41 @@ fn ingest_markdown_weight(input: &mut SplitWhitespace, conn: &Connection) {
         // ["2023-12-03", " 105.4kg"]
         let date = match parts.next() {
             Some(date) => date,
-            None => continue
+            None => continue,
         };
         let mut date_parts = date.split('-');
         let year = match date_parts.next().and_then(|year| year.parse::<i32>().ok()) {
             Some(year) => year,
-            None => continue
+            None => continue,
         };
-        let month = match date_parts.next().and_then(|month| month.parse::<u32>().ok()) {
+        let month = match date_parts
+            .next()
+            .and_then(|month| month.parse::<u32>().ok())
+        {
             Some(month) => month,
-            None => continue
+            None => continue,
         };
         let day = match date_parts.next().and_then(|day| day.parse::<u32>().ok()) {
             Some(day) => day,
-            None => continue
+            None => continue,
         };
         // assume measurements were taken at 09:00
-        let timestamp = Utc.with_ymd_and_hms(year, month, day, 9, 0, 0).unwrap().timestamp();
-        
+        let timestamp = Utc
+            .with_ymd_and_hms(year, month, day, 9, 0, 0)
+            .unwrap()
+            .timestamp();
+
         let weight = match parts.next() {
             Some(weight) => weight.trim().replace("kg", ""),
-            None => continue
+            None => continue,
         };
 
         conn.execute(
             "INSERT INTO weight (timestamp, weight) VALUES (?1, ?2);",
-            params![timestamp, weight]
+            params![timestamp, weight],
         )
         .expect("Failed to persist weight data");
-    
+
         println!("Recorded weight: {}kg", weight)
     }
 }
