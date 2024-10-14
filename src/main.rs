@@ -1,9 +1,10 @@
-use std::{fs, io, str::SplitWhitespace};
+use std::{fs, io, str::SplitWhitespace, time::Duration};
 use bp::BP;
 use chrono::{TimeZone, Utc};
 use heartrate::Heartrate;
+use ini::configparser::ini::Ini;
 use mood::Mood;
-use rusqlite::{params, Connection};
+use rusqlite::{backup::{Backup}, params, Connection};
 use weight::Weight;
 
 mod weight;
@@ -70,11 +71,26 @@ fn main() {
             "mood" => println!("{}", Mood::command(&mut input, &conn)),
             "heartrate" => println!("{}", Heartrate::command(&mut input, &conn)),
             "ingest_markdown_weight" => ingest_markdown_weight(&mut input, &conn),
+            "backup" => println!("{}", backup(&mut input, &conn)),
             "q" => running = false,
             _ => println!("Unknown command: {}", command)
         }
     }
 
+    drop(conn);
+}
+
+fn write_ini() -> Result<(), io::Error>{
+    let mut ini = Ini::new();
+
+    ini.set("General", "user", None);
+
+    ini.write("config.ini")
+}
+
+fn read_ini() {
+    let mut ini = Ini::new();
+    let ini = ini.load("config.ini");
 }
 
 fn create_tables(conn: &Connection) {
@@ -92,9 +108,32 @@ fn help() -> String {
     help.push_str(&Mood::help());
     help.push_str(&Heartrate::help());
     help.push_str("\tingest_markdown_weight <file_path:str>\n");
+    help.push_str("\tbackup <backup_path:str>");
     help.push_str("\tq -> exit");
     
     help
+}
+
+fn backup(input: &mut SplitWhitespace, conn: &Connection) -> String {
+    let path = match input.next() {
+        Some(param) => param,
+        None => return String::from("Missing destination path")
+    };
+
+    let mut backup_conn = match Connection::open(path) {
+        Ok(backup_conn) => backup_conn,
+        Err(e) => return format!("Failed to create/open backup target\n{}", e)
+    };
+
+    let backup = match Backup::new(conn, &mut backup_conn) {
+        Ok(backup) => backup,
+        Err(e) => return format!("Failed to initialize backup\n{}", e)
+    };
+    
+    match backup.run_to_completion(5, Duration::from_millis(250), None) {
+        Ok(_) => String::from("backup done"),
+        Err(_) => String::from("backup failed")
+    }
 }
 
 fn ingest_markdown_weight(input: &mut SplitWhitespace, conn: &Connection) {
