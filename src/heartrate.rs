@@ -1,5 +1,5 @@
-use std::fmt::Write;
 use std::str::SplitWhitespace;
+use std::{error::Error, fmt::Write};
 
 use chrono::Utc;
 use rusqlite::{params, Connection};
@@ -9,7 +9,7 @@ use crate::{utils, Stat};
 struct HeartrateORM {
     _id: i64,
     timestamp: i64,
-    heartrate: i16,
+    heartrate: u8,
     duration: i16,
 }
 
@@ -92,26 +92,30 @@ impl Stat for Heartrate {
                 }
             }
             _ => {
-                let heartrate = match param.parse::<i64>() {
+                let heartrate = match param.parse::<u8>() {
                     Ok(heartrate) => heartrate,
                     Err(e) => return format!("Failed to parse parameter: {}", e),
                 };
 
-                let timestamp = Utc::now().timestamp();
-                conn.execute(
-                    "INSERT INTO heartrate (timestamp, heartrate) VALUES (?1, ?2);",
-                    params![timestamp, heartrate],
-                )
-                .expect("Failed to persist heartrate data");
-
-                format!("Recorded heartrate: {}bpm", heartrate)
+                match write_heartrate(heartrate, conn) {
+                    Ok(_) => format!("Recorded heartrate: {}bpm", heartrate),
+                    Err(err) => format!("Failed to write heartrate data\n{}", err),
+                }
             }
         }
     }
 
     fn help() -> String {
-        String::from("\theartrate <last <count:i64> | heartrate:i16>\n")
+        String::from("\theartrate <last <count:i64> | heartrate:u8>\n")
     }
+}
+
+pub fn write_heartrate(value: u8, conn: &Connection) -> Result<usize, Box<dyn Error>> {
+    let timestamp = Utc::now().timestamp();
+    Ok(conn.execute(
+        "INSERT INTO heartrate (timestamp, heartrate) VALUES (?1, ?2);",
+        params![timestamp, value],
+    )?)
 }
 
 fn last(input: &mut SplitWhitespace, conn: &Connection) -> String {
@@ -181,7 +185,7 @@ fn rle_encode(mut raw: Vec<HeartrateORM>) -> Vec<HeartrateORM> {
 
     println!("Compressing {} elements", raw.len());
 
-    let step: i16 = 1; // how many unix time thingies are between two sensor reads?
+    let step: i16 = 1; // readings happen every second, ideally
 
     let mut iter = raw.iter_mut();
 

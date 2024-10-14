@@ -26,7 +26,6 @@ pub trait Stat {
 async fn main() {
     setup_logger().expect("Failed to setup logger");
     info!("Biomon launched");
-    let _p = ble_hrp::identify_device("C2:7A:75:27:F7:3E", ble_hrp::scan().await).await;
 
     let conn = match Connection::open("biomon.sqlite") {
         Ok(conn) => conn,
@@ -49,7 +48,7 @@ async fn main() {
 
     create_tables(&conn);
 
-    println!("NOTE: Commonly used unit are implied for all entered data.");
+    println!("NOTE: Commonly used unit are implied for all entered data");
     println!("NOTE: Enter 'help' to see help");
 
     let mut running = true;
@@ -78,6 +77,7 @@ async fn main() {
             "bp" => println!("{}", BP::command(&mut input, &conn)),
             "mood" => println!("{}", Mood::command(&mut input, &conn)),
             "heartrate" => println!("{}", Heartrate::command(&mut input, &conn)),
+            "record_hrp" => ble_hrp::record_hrp_device("", &conn).await,
             "ingest_markdown_weight" => ingest_markdown_weight(&mut input, &conn),
             "backup" => println!("{}", backup(&mut input, &conn)),
             "q" => running = false,
