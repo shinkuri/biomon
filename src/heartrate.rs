@@ -22,7 +22,7 @@ impl Stat for Heartrate {
             .execute(
                 "CREATE TABLE IF NOT EXISTS heartrate (
                     id          INTEGER PRIMARY KEY,
-                    timestamp   INTEGER NOT NULL,
+                    timestamp   INTEGER UNIQUE NOT NULL,
                     heartrate   INTEGER NOT NULL,
                     duration    INTEGER DEFAULT (0) NOT NULL
                 );",

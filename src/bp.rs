@@ -21,7 +21,7 @@ impl Stat for BP {
             .execute(
                 "CREATE TABLE IF NOT EXISTS bp (
                     id          INTEGER PRIMARY KEY,
-                    timestamp   INTEGER NOT NULL,
+                    timestamp   INTEGER UNIQUE NOT NULL,
                     sys         INTEGER NOT NULL,
                     dia         INTEGER NOT NULL
                 );",

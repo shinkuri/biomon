@@ -20,7 +20,7 @@ impl Stat for Mood {
             .execute(
                 "CREATE TABLE IF NOT EXISTS mood (
                     id          INTEGER PRIMARY KEY,
-                    timestamp   INTEGER NOT NULL,
+                    timestamp   INTEGER UNIQUE NOT NULL,
                     mood        TEXT NOT NULL
                 );",
                 [],

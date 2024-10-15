@@ -82,10 +82,27 @@ async fn main() {
             "record_hrp" => ble_hrp::record_hrp_device("C2:7A:75:27:F7:3E", &conn).await,
             "ingest_markdown_weight" => ingest_markdown_weight(&mut input, &conn),
             "backup" => println!("{}", backup(&mut input, &conn)),
+            "upgrade_tables" => println!("{}", upgrade_tables(&mut input, &conn)),
             "q" => running = false,
             _ => println!("Unknown command: {}", command),
         }
     }
+}
+
+fn help() -> String {
+    let mut help = String::new();
+    help.push_str("List of commands:\n");
+    help.push_str(&Weight::help());
+    help.push_str(&BP::help());
+    help.push_str(&Mood::help());
+    help.push_str(&Heartrate::help());
+    help.push_str("\trecord_hrp - Connects to BLE HRP compatible device and collects heartrate data\n");
+    help.push_str("\tingest_markdown_weight <file_path:str>\n");
+    help.push_str("\tbackup <backup_path:str>\n");
+    help.push_str("\tupgrade_tables <file_path:str>\n");
+    help.push_str("\tq -> exit");
+
+    help
 }
 
 fn setup_logger() -> Result<(), Box<dyn std::error::Error>> {
@@ -113,19 +130,43 @@ fn create_tables(conn: &Connection) {
     Heartrate::tables(conn);
 }
 
-fn help() -> String {
-    let mut help = String::new();
-    help.push_str("List of commands:\n");
-    help.push_str(&Weight::help());
-    help.push_str(&BP::help());
-    help.push_str(&Mood::help());
-    help.push_str(&Heartrate::help());
-    help.push_str("\trecord_hrp - Connects to BLE HRP compatible device and collects heartrate data");
-    help.push_str("\tingest_markdown_weight <file_path:str>\n");
-    help.push_str("\tbackup <backup_path:str>");
-    help.push_str("\tq -> exit");
+fn upgrade_tables(input: &mut SplitWhitespace, conn: &Connection) -> String {
+    let file = match input.next() {
+        Some(file) => file,
+        None => {
+            error!("Missing migration script path");
+            return String::from("Missing migration script path")
+        },
+    };
 
-    help
+    let contents = match fs::read_to_string(file) {
+        Ok(contents) => contents,
+        Err(err) => {
+            error!("Failed to read migration script -> {}", err);
+            String::from("Failed to read migration script. Check log for full error.")
+        },
+    };
+
+    // Remove comments
+    let contents = contents
+        .lines()
+        .filter(|&line| !line.starts_with("--"))
+        .fold(String::new(), |mut acc, line| {
+            acc.push_str(line);
+            acc.push_str("\n");
+            acc
+        });
+
+    match conn.execute_batch(&contents) {
+        Ok(_) => {
+            info!("Database migrated");
+            String::from("Database migrated")
+        },
+        Err(err) => {
+            error!("Failed to run database migration script -> {}", err);
+            String::from("Failed to run database migration script. Check log for full error.")
+        },
+    }
 }
 
 fn backup(input: &mut SplitWhitespace, conn: &Connection) -> String {
@@ -156,7 +197,13 @@ fn ingest_markdown_weight(input: &mut SplitWhitespace, conn: &Connection) {
         None => return,
     };
 
-    let contents = fs::read_to_string(file).unwrap();
+    let contents = match fs::read_to_string(file) {
+        Ok(contents) => contents,
+        Err(err) => {
+            error!("Failed to read weight file -> {}", err);
+            return;
+        },
+    };
 
     for line in contents.lines() {
         // - 2023-12-03: 105.4kg

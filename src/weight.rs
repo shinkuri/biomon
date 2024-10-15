@@ -20,7 +20,7 @@ impl Stat for Weight {
             .execute(
                 "CREATE TABLE IF NOT EXISTS weight (
                     id          INTEGER PRIMARY KEY,
-                    timestamp   INTEGER NOT NULL,
+                    timestamp   INTEGER UNIQUE NOT NULL,
                     weight      REAL NOT NULL
                 );",
                 [],
