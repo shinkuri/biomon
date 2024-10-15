@@ -96,7 +96,9 @@ fn help() -> String {
     help.push_str(&BP::help());
     help.push_str(&Mood::help());
     help.push_str(&Heartrate::help());
-    help.push_str("\trecord_hrp - Connects to BLE HRP compatible device and collects heartrate data\n");
+    help.push_str(
+        "\trecord_hrp - Connects to BLE HRP compatible device and collects heartrate data\n",
+    );
     help.push_str("\tingest_markdown_weight <file_path:str>\n");
     help.push_str("\tbackup <backup_path:str>\n");
     help.push_str("\tupgrade_tables <file_path:str>\n");
@@ -135,8 +137,8 @@ fn upgrade_tables(input: &mut SplitWhitespace, conn: &Connection) -> String {
         Some(file) => file,
         None => {
             error!("Missing migration script path");
-            return String::from("Missing migration script path")
-        },
+            return String::from("Missing migration script path");
+        }
     };
 
     let contents = match fs::read_to_string(file) {
@@ -144,7 +146,7 @@ fn upgrade_tables(input: &mut SplitWhitespace, conn: &Connection) -> String {
         Err(err) => {
             error!("Failed to read migration script -> {}", err);
             String::from("Failed to read migration script. Check log for full error.")
-        },
+        }
     };
 
     // Remove comments
@@ -153,7 +155,7 @@ fn upgrade_tables(input: &mut SplitWhitespace, conn: &Connection) -> String {
         .filter(|&line| !line.starts_with("--"))
         .fold(String::new(), |mut acc, line| {
             acc.push_str(line);
-            acc.push_str("\n");
+            acc.push('\n');
             acc
         });
 
@@ -161,11 +163,11 @@ fn upgrade_tables(input: &mut SplitWhitespace, conn: &Connection) -> String {
         Ok(_) => {
             info!("Database migrated");
             String::from("Database migrated")
-        },
+        }
         Err(err) => {
             error!("Failed to run database migration script -> {}", err);
             String::from("Failed to run database migration script. Check log for full error.")
-        },
+        }
     }
 }
 
@@ -202,7 +204,7 @@ fn ingest_markdown_weight(input: &mut SplitWhitespace, conn: &Connection) {
         Err(err) => {
             error!("Failed to read weight file -> {}", err);
             return;
-        },
+        }
     };
 
     for line in contents.lines() {
