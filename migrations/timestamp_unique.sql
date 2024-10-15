@@ -29,15 +29,15 @@ FROM bp;
 
 INSERT INTO heartrate_new (id, timestamp, heartrate)
 SELECT id, timestamp, heartrate
-FROM bp;
+FROM heartrate;
 
 INSERT INTO mood_new (id, timestamp, mood)
 SELECT id, timestamp, mood
-FROM bp;
+FROM mood;
 
 INSERT INTO weight_new (id, timestamp, weight)
 SELECT id, timestamp, weight
-FROM bp;
+FROM weight;
 
 -- Step 3: Drop the old table
 DROP TABLE bp;
