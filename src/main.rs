@@ -82,6 +82,7 @@ async fn main() {
             "record_hrp" => ble_hrp::record_hrp_device("C2:7A:75:27:F7:3E", &conn).await,
             "ingest_markdown_weight" => ingest_markdown_weight(&mut input, &conn),
             "backup" => println!("{}", backup(&mut input, &conn)),
+            "restore" => println!("{}", restore(&mut input)),
             "upgrade_tables" => println!("{}", upgrade_tables(&mut input, &conn)),
             "q" => running = false,
             _ => println!("Unknown command: {}", command),
@@ -100,7 +101,8 @@ fn help() -> String {
         "\trecord_hrp - Connects to BLE HRP compatible device and collects heartrate data\n",
     );
     help.push_str("\tingest_markdown_weight <file_path:str>\n");
-    help.push_str("\tbackup <backup_path:str>\n");
+    help.push_str("\tbackup <backup_path:str> - default: ./biomon.sqlite.bak\n");
+    help.push_str("\restore <backup_path:str> - default: ./biomon.sqlite.bak\n");
     help.push_str("\tupgrade_tables <file_path:str>\n");
     help.push_str("\tq -> exit");
 
@@ -172,25 +174,65 @@ fn upgrade_tables(input: &mut SplitWhitespace, conn: &Connection) -> String {
 }
 
 fn backup(input: &mut SplitWhitespace, conn: &Connection) -> String {
+    let mut output = String::new();
+
     let path = match input.next() {
         Some(param) => param,
-        None => return String::from("Missing destination path"),
+        None => {
+            output.push_str("Using default destination path ./biomon.sqlite.bak\n");
+            "biomon.sqlite.bak"
+        }
     };
 
     let mut backup_conn = match Connection::open(path) {
         Ok(backup_conn) => backup_conn,
-        Err(e) => return format!("Failed to create/open backup target\n{}", e),
+        Err(err) => {
+            output.push_str(&format!("Failed to create/open backup target\n{}\n", err));
+            return output;
+        }
     };
 
     let backup = match Backup::new(conn, &mut backup_conn) {
         Ok(backup) => backup,
-        Err(e) => return format!("Failed to initialize backup\n{}", e),
+        Err(e) => {
+            output.push_str(&format!("Failed to initialize backup\n{}\n", e));
+            return output;
+        }
     };
 
     match backup.run_to_completion(5, Duration::from_millis(250), None) {
-        Ok(_) => String::from("backup done"),
-        Err(_) => String::from("backup failed"),
-    }
+        Ok(_) => output.push_str("Backup done\n"),
+        Err(_) => output.push_str("Backup failed\n"),
+    };
+
+    output
+}
+
+fn restore(input: &mut SplitWhitespace) -> String {
+    let mut output = String::new();
+
+    let path = match input.next() {
+        Some(param) => param,
+        None => {
+            output.push_str("Using default source path ./biomon.sqlite.bak");
+            "biomon.sqlite.bak"
+        }
+    };
+
+    match fs::remove_file("biomon.sqlite") {
+        Ok(_) => output.push_str("Removed database\n"),
+        Err(err) => {
+            output.push_str(&format!("Failed to remove database\n{}\n", err));
+            return output;
+        }
+    };
+
+    match fs::copy(path, "biomon.sqlite") {
+        Ok(_) => output.push_str("Restore done\n"),
+        Err(_) => output.push_str("Restore failed\n"),
+    };
+
+    output
 }
 
 fn ingest_markdown_weight(input: &mut SplitWhitespace, conn: &Connection) {
