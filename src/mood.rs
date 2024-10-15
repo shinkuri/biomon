@@ -1,6 +1,7 @@
 use std::str::SplitWhitespace;
 
 use chrono::Utc;
+use log::error;
 use rusqlite::{params, Connection};
 
 use crate::{utils, Stat};
@@ -15,15 +16,16 @@ pub struct Mood;
 
 impl Stat for Mood {
     fn tables(conn: &Connection) {
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS mood (
+        let _ = conn
+            .execute(
+                "CREATE TABLE IF NOT EXISTS mood (
                     id          INTEGER PRIMARY KEY,
                     timestamp   INTEGER NOT NULL,
                     mood        TEXT NOT NULL
                 );",
-            [],
-        )
-        .expect("Failed to ensure table 'mood' exists");
+                [],
+            )
+            .map_err(|err| error!("Failed to ensure table 'mood' exists -> {}", err));
     }
 
     fn command(input: &mut SplitWhitespace, conn: &Connection) -> String {
@@ -36,13 +38,16 @@ impl Stat for Mood {
             "last" => last(input, conn),
             _ => {
                 let timestamp = Utc::now().timestamp();
-                conn.execute(
+                match conn.execute(
                     "INSERT INTO mood (timestamp, mood) VALUES (?1, ?2);",
                     params![timestamp, param],
-                )
-                .expect("Failed to persist mood data");
-
-                format!("Recorded mood: {}", param)
+                ) {
+                    Ok(_) => format!("Recorded mood: {}", param),
+                    Err(err) => {
+                        error!("Failed to write mood to database -> {}", err);
+                        String::from("Failed to write mood to database. Check log for full error.")
+                    }
+                }
             }
         }
     }

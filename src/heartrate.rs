@@ -2,6 +2,7 @@ use std::str::SplitWhitespace;
 use std::{error::Error, fmt::Write};
 
 use chrono::Utc;
+use log::error;
 use rusqlite::{params, Connection};
 
 use crate::{utils, Stat};
@@ -17,16 +18,17 @@ pub struct Heartrate;
 
 impl Stat for Heartrate {
     fn tables(conn: &Connection) {
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS heartrate (
+        let _ = conn
+            .execute(
+                "CREATE TABLE IF NOT EXISTS heartrate (
                     id          INTEGER PRIMARY KEY,
                     timestamp   INTEGER NOT NULL,
                     heartrate   INTEGER NOT NULL,
                     duration    INTEGER DEFAULT (0) NOT NULL
                 );",
-            [],
-        )
-        .expect("Failed to ensure table 'heartrate' exists");
+                [],
+            )
+            .map_err(|err| error!("Failed to ensure table 'heartrate' exists -> {}", err));
     }
 
     fn command(input: &mut SplitWhitespace, conn: &Connection) -> String {
@@ -78,15 +80,23 @@ impl Stat for Heartrate {
                                 hr.timestamp, hr.heartrate, hr.duration, hr._id
                             );
                         }
-                        conn.execute_batch(&update)
-                            .expect("Failed to persist compression");
+                        if let Err(err) = conn.execute_batch(&update).map_err(|err| {
+                            error!("Failed to persist compression -> {}", err);
+                            String::from("Failed to persist compression. Check log for full error.")
+                        }) {
+                            return err;
+                        }
 
                         // Delete all entries with duration = -1
-                        let deleted = conn
-                            .execute("DELETE FROM heartrate WHERE duration = -1;", [])
-                            .expect("Failed to clean up heartrate data");
-
-                        format!("Reduced entries by {}", deleted)
+                        match conn.execute("DELETE FROM heartrate WHERE duration = -1;", []) {
+                            Ok(deleted) => format!("Reduced entries by {}", deleted),
+                            Err(err) => {
+                                error!("Failed to clean up heartrate data -> {}", err);
+                                String::from(
+                                    "Failed to clean up heartrate data. Check log for full error.",
+                                )
+                            }
+                        }
                     }
                     Err(err) => format!("Failed to read heartrate history\n{}", err),
                 }

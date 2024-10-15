@@ -1,6 +1,7 @@
 use std::str::SplitWhitespace;
 
 use chrono::Utc;
+use log::error;
 use rusqlite::{params, Connection};
 
 use crate::{utils, Stat};
@@ -16,16 +17,17 @@ pub struct BP;
 
 impl Stat for BP {
     fn tables(conn: &Connection) {
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS bp (
+        let _ = conn
+            .execute(
+                "CREATE TABLE IF NOT EXISTS bp (
                     id          INTEGER PRIMARY KEY,
                     timestamp   INTEGER NOT NULL,
                     sys         INTEGER NOT NULL,
                     dia         INTEGER NOT NULL
                 );",
-            [],
-        )
-        .expect("Failed to ensure table 'bp' exists");
+                [],
+            )
+            .map_err(|err| error!("Failed to ensure table 'bp' exists -> {}", err));
     }
 
     fn command(input: &mut SplitWhitespace, conn: &Connection) -> String {
@@ -52,13 +54,16 @@ impl Stat for BP {
                 };
 
                 let timestamp = Utc::now().timestamp();
-                conn.execute(
+                match conn.execute(
                     "INSERT INTO bp (timestamp, sys, dia) VALUES (?1, ?2, ?3);",
                     params![timestamp, sys, dia],
-                )
-                .expect("Failed to persist bp data");
-
-                format!("Recorded bp: {}mmHg systolic, {}mmHg diastolic", sys, dia)
+                ) {
+                    Ok(_) => format!("Recorded bp: {}mmHg systolic, {}mmHg diastolic", sys, dia),
+                    Err(err) => {
+                        error!("Failed to write bp to database -> {}", err);
+                        String::from("Failed to write bp to database. Check log for full error.")
+                    }
+                }
             }
         }
     }

@@ -1,6 +1,7 @@
 use std::str::SplitWhitespace;
 
 use chrono::Utc;
+use log::error;
 use rusqlite::{params, Connection};
 
 use crate::{utils, Stat};
@@ -15,15 +16,16 @@ pub struct Weight;
 
 impl Stat for Weight {
     fn tables(conn: &Connection) {
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS weight (
+        let _ = conn
+            .execute(
+                "CREATE TABLE IF NOT EXISTS weight (
                     id          INTEGER PRIMARY KEY,
                     timestamp   INTEGER NOT NULL,
                     weight      REAL NOT NULL
                 );",
-            [],
-        )
-        .expect("Failed to ensure table 'weight' exists");
+                [],
+            )
+            .map_err(|err| error!("Failed to ensure table 'weight' exists -> {}", err));
     }
 
     fn command(input: &mut SplitWhitespace, conn: &Connection) -> String {
@@ -41,13 +43,18 @@ impl Stat for Weight {
                 };
 
                 let timestamp = Utc::now().timestamp();
-                conn.execute(
+                match conn.execute(
                     "INSERT INTO weight (timestamp, weight) VALUES (?1, ?2);",
                     params![timestamp, weight],
-                )
-                .expect("Failed to persist weight data");
-
-                format!("Recorded weight: {}kg", weight)
+                ) {
+                    Ok(_) => format!("Recorded weight: {}kg", weight),
+                    Err(err) => {
+                        error!("Failed to write weight to database -> {}", err);
+                        String::from(
+                            "Failed to write weight to database. Check log for full error.",
+                        )
+                    }
+                }
             }
         }
     }

@@ -4,7 +4,7 @@ use fern::Dispatch;
 use heartrate::Heartrate;
 use std::{fs, io, str::SplitWhitespace, time::Duration};
 
-use log::info;
+use log::{error, info};
 use mood::Mood;
 use rusqlite::{backup::Backup, params, Connection};
 use weight::Weight;
@@ -37,9 +37,10 @@ async fn main() {
             let mut input = String::new();
             while !input.starts_with('q') {
                 // Wait for user input
-                io::stdin()
-                    .read_line(&mut input)
-                    .expect("Failed to read input");
+                let _ = io::stdin().read_line(&mut input).map_err(|err| {
+                    error!("Failed to read stdin -> {}", err);
+                    println!("Failed to read stdin. Check log for full error.")
+                });
             }
 
             return;
@@ -57,9 +58,10 @@ async fn main() {
         let mut input = String::new();
 
         // Wait for user input
-        io::stdin()
-            .read_line(&mut input)
-            .expect("Failed to read input");
+        let _ = io::stdin().read_line(&mut input).map_err(|err| {
+            error!("Failed to read stdin -> {}", err);
+            println!("Failed to read stdin. Check log for full error.")
+        });
 
         let mut input = input.split_whitespace();
 
@@ -77,7 +79,7 @@ async fn main() {
             "bp" => println!("{}", BP::command(&mut input, &conn)),
             "mood" => println!("{}", Mood::command(&mut input, &conn)),
             "heartrate" => println!("{}", Heartrate::command(&mut input, &conn)),
-            "record_hrp" => ble_hrp::record_hrp_device("", &conn).await,
+            "record_hrp" => ble_hrp::record_hrp_device("C2:7A:75:27:F7:3E", &conn).await,
             "ingest_markdown_weight" => ingest_markdown_weight(&mut input, &conn),
             "backup" => println!("{}", backup(&mut input, &conn)),
             "q" => running = false,
@@ -118,6 +120,7 @@ fn help() -> String {
     help.push_str(&BP::help());
     help.push_str(&Mood::help());
     help.push_str(&Heartrate::help());
+    help.push_str("\trecord_hrp - Connects to BLE HRP compatible device and collects heartrate data");
     help.push_str("\tingest_markdown_weight <file_path:str>\n");
     help.push_str("\tbackup <backup_path:str>");
     help.push_str("\tq -> exit");
@@ -192,12 +195,15 @@ fn ingest_markdown_weight(input: &mut SplitWhitespace, conn: &Connection) {
             None => continue,
         };
 
-        conn.execute(
+        match conn.execute(
             "INSERT INTO weight (timestamp, weight) VALUES (?1, ?2);",
             params![timestamp, weight],
-        )
-        .expect("Failed to persist weight data");
-
-        println!("Recorded weight: {}kg", weight)
+        ) {
+            Ok(_) => println!("Recorded weight: {}kg", weight),
+            Err(err) => {
+                error!("Failed to write weight to database -> {}", err);
+                println!("Failed to write weight to database. Check log for full error.");
+            }
+        };
     }
 }
