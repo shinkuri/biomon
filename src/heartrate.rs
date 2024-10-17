@@ -2,7 +2,7 @@ use std::str::SplitWhitespace;
 use std::{error::Error, fmt::Write};
 
 use chrono::Utc;
-use log::error;
+use log::{error, info};
 use rusqlite::{params, Connection};
 
 use crate::{utils, Stat};
@@ -40,16 +40,20 @@ impl Stat for Heartrate {
         match param {
             "last" => last(input, conn),
             "compress" => {
-                let mut query = conn
-                    .prepare(
-                        "
+                let mut query = match conn.prepare(
+                    "
                     SELECT id, timestamp, heartrate, duration
                     FROM heartrate
                     ORDER BY timestamp DESC;
                 ",
-                    )
-                    .expect("Failed to prepare query last");
-
+                ) {
+                    Ok(query) => query,
+                    Err(err) => {
+                        error!("Failed to prepare query for RLE -> {}", err);
+                        return String::from("Failed to prepare query for RLE. Check log for full error.");
+                    }
+                };
+                
                 let results = query.query_map([], |row| {
                     Ok(HeartrateORM {
                         _id: row.get(0)?,
@@ -146,16 +150,21 @@ fn last(input: &mut SplitWhitespace, conn: &Connection) -> String {
         }
     };
 
-    let mut query = conn
-        .prepare(
-            "
+    let mut query = match conn.prepare(
+        "
         SELECT id, timestamp, heartrate, duration
         FROM heartrate
         ORDER BY timestamp DESC
         LIMIT (?1);
     ",
-        )
-        .expect("Failed to prepare query last");
+    ) {
+        Ok(query) => query,
+        Err(err) => {
+            error!("Failed to prepare query 'last' for heartrate -> {}", err);
+            output.push_str("Failed to prepare query 'last' for heartrate. Check log for full error.");
+            return output;
+        }
+    };
 
     let results = query.query_map([take], |row| {
         Ok(HeartrateORM {
@@ -193,7 +202,7 @@ fn rle_encode(mut raw: Vec<HeartrateORM>) -> Vec<HeartrateORM> {
         return raw;
     };
 
-    println!("Compressing {} elements", raw.len());
+    info!("Compressing {} elements", raw.len());
 
     let step: i16 = 1; // readings happen every second, ideally
 
@@ -203,8 +212,7 @@ fn rle_encode(mut raw: Vec<HeartrateORM>) -> Vec<HeartrateORM> {
     let mut next = iter.next().unwrap();
     let mut c = 1;
     loop {
-        // this.timestamp - next.timestamp == step.into() &&
-        if this.heartrate == next.heartrate {
+        if this.timestamp - next.timestamp == step.into() && this.heartrate == next.heartrate {
             this.duration = -1;
             c += 1;
         } else {

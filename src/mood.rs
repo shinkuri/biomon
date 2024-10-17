@@ -75,16 +75,21 @@ fn last(input: &mut SplitWhitespace, conn: &Connection) -> String {
         }
     };
 
-    let mut query = conn
-        .prepare(
-            "
+    let mut query = match conn.prepare(
+        "
         SELECT id, timestamp, mood
         FROM mood
         ORDER BY timestamp DESC
         LIMIT (?1);
     ",
-        )
-        .expect("Failed to prepare query last");
+    ) {
+        Ok(query) => query,
+        Err(err) => {
+            error!("Failed to prepare query 'last' for mood -> {}", err);
+            output.push_str("Failed to prepare query 'last' for mood. Check log for full error.");
+            return output;
+        }
+    };
 
     let results = query.query_map([take], |row| {
         Ok(MoodORM {

@@ -79,7 +79,7 @@ async fn main() {
             "bp" => println!("{}", BP::command(&mut input, &conn)),
             "mood" => println!("{}", Mood::command(&mut input, &conn)),
             "heartrate" => println!("{}", Heartrate::command(&mut input, &conn)),
-            "record_hrp" => ble_hrp::record_hrp_device("C2:7A:75:27:F7:3E", &conn).await,
+            "record_hrp" => ble_hrp::record_hrp_device("", &conn).await,
             "ingest_markdown_weight" => ingest_markdown_weight(&mut input, &conn),
             "backup" => println!("{}", backup(&mut input, &conn)),
             "restore" => println!("{}", restore(&mut input)),
@@ -102,7 +102,7 @@ fn help() -> String {
     );
     help.push_str("\tingest_markdown_weight <file_path:str>\n");
     help.push_str("\tbackup <backup_path:str> - default: ./biomon.sqlite.bak\n");
-    help.push_str("\restore <backup_path:str> - default: ./biomon.sqlite.bak\n");
+    help.push_str("\testore <backup_path:str> - default: ./biomon.sqlite.bak\n");
     help.push_str("\tupgrade_tables <file_path:str>\n");
     help.push_str("\tq -> exit");
 
@@ -214,7 +214,7 @@ fn restore(input: &mut SplitWhitespace) -> String {
     let path = match input.next() {
         Some(param) => param,
         None => {
-            output.push_str("Using default source path ./biomon.sqlite.bak");
+            output.push_str("Using default source path ./biomon.sqlite.bak\n");
             "biomon.sqlite.bak"
         }
     };
