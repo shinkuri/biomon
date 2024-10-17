@@ -2,8 +2,8 @@ use bp::BP;
 use chrono::{TimeZone, Utc};
 use fern::Dispatch;
 use heartrate::Heartrate;
-use temperature::Temperature;
 use std::{fs, io, str::SplitWhitespace, time::Duration};
+use temperature::Temperature;
 
 use log::{error, info};
 use mood::Mood;
@@ -14,9 +14,9 @@ mod ble_hrp;
 mod bp;
 mod heartrate;
 mod mood;
+mod temperature;
 mod utils;
 mod weight;
-mod temperature;
 
 pub trait Stat {
     fn tables(conn: &Connection);
@@ -131,7 +131,24 @@ fn setup_logger() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+fn tables(conn: &Connection) {
+    let _ = conn
+        .execute(
+            "CREATE TABLE IF NOT EXISTS instruments (
+                    id          INTEGER PRIMARY KEY,
+                    metric      TEXT UNIQUE NOT NULL,
+                    name        TEXT NOT NULL,
+                    introduced  INTEGER NOT NULL,
+                    deprecated  INTEGER,
+                    notes TEXT,
+                );",
+            [],
+        )
+        .map_err(|err| error!("Failed to ensure table 'instruments' exists -> {}", err));
+}
+
 fn create_tables(conn: &Connection) {
+    tables(conn);
     Weight::tables(conn);
     BP::tables(conn);
     Mood::tables(conn);
