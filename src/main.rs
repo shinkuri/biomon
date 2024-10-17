@@ -2,6 +2,7 @@ use bp::BP;
 use chrono::{TimeZone, Utc};
 use fern::Dispatch;
 use heartrate::Heartrate;
+use temperature::Temperature;
 use std::{fs, io, str::SplitWhitespace, time::Duration};
 
 use log::{error, info};
@@ -15,6 +16,7 @@ mod heartrate;
 mod mood;
 mod utils;
 mod weight;
+mod temperature;
 
 pub trait Stat {
     fn tables(conn: &Connection);
@@ -79,7 +81,8 @@ async fn main() {
             "bp" => println!("{}", BP::command(&mut input, &conn)),
             "mood" => println!("{}", Mood::command(&mut input, &conn)),
             "heartrate" => println!("{}", Heartrate::command(&mut input, &conn)),
-            "record_hrp" => ble_hrp::record_hrp_device("", &conn).await,
+            "temp" => println!("{}", Temperature::command(&mut input, &conn)),
+            "record_hrp" => ble_hrp::record_hrp_device("C2:7A:75:27:F7:3E", &conn).await,
             "ingest_markdown_weight" => ingest_markdown_weight(&mut input, &conn),
             "backup" => println!("{}", backup(&mut input, &conn)),
             "restore" => println!("{}", restore(&mut input)),
@@ -97,6 +100,7 @@ fn help() -> String {
     help.push_str(&BP::help());
     help.push_str(&Mood::help());
     help.push_str(&Heartrate::help());
+    help.push_str(&Temperature::help());
     help.push_str(
         "\trecord_hrp - Connects to BLE HRP compatible device and collects heartrate data\n",
     );
@@ -132,6 +136,7 @@ fn create_tables(conn: &Connection) {
     BP::tables(conn);
     Mood::tables(conn);
     Heartrate::tables(conn);
+    Temperature::tables(conn);
 }
 
 fn upgrade_tables(input: &mut SplitWhitespace, conn: &Connection) -> String {
