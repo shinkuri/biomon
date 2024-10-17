@@ -50,10 +50,12 @@ impl Stat for Temperature {
                     Ok(query) => query,
                     Err(err) => {
                         error!("Failed to prepare query for RLE -> {}", err);
-                        return String::from("Failed to prepare query for RLE. Check log for full error.");
+                        return String::from(
+                            "Failed to prepare query for RLE. Check log for full error.",
+                        );
                     }
                 };
-                
+
                 let results = query.query_map([], |row| {
                     Ok(TemperatureORM {
                         _id: row.get(0)?,
@@ -161,7 +163,9 @@ fn last(input: &mut SplitWhitespace, conn: &Connection) -> String {
         Ok(query) => query,
         Err(err) => {
             error!("Failed to prepare query 'last' for temperature -> {}", err);
-            output.push_str("Failed to prepare query 'last' for temperature. Check log for full error.");
+            output.push_str(
+                "Failed to prepare query 'last' for temperature. Check log for full error.",
+            );
             return output;
         }
     };
