@@ -140,7 +140,9 @@ fn tables(conn: &Connection) {
                     name        TEXT NOT NULL,
                     introduced  INTEGER NOT NULL,
                     deprecated  INTEGER,
-                    notes TEXT,
+                    tol_min     REAL,
+                    tol_max     REAL,
+                    notes       TEXT
                 );",
             [],
         )

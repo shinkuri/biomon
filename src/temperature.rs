@@ -10,7 +10,7 @@ use crate::{utils, Stat};
 struct TemperatureORM {
     _id: i64,
     timestamp: i64,
-    temperature: u8,
+    temperature: f32,
     duration: i16,
 }
 
@@ -23,7 +23,7 @@ impl Stat for Temperature {
                 "CREATE TABLE IF NOT EXISTS temperature (
                     id          INTEGER PRIMARY KEY,
                     timestamp   INTEGER UNIQUE NOT NULL,
-                    temperature   INTEGER NOT NULL,
+                    temperature REAL NOT NULL,
                     duration    INTEGER DEFAULT (0) NOT NULL
                 );",
                 [],
@@ -108,13 +108,13 @@ impl Stat for Temperature {
                 }
             }
             _ => {
-                let temperature = match param.parse::<u8>() {
+                let temperature = match param.parse::<f32>() {
                     Ok(temperature) => temperature,
                     Err(e) => return format!("Failed to parse parameter: {}", e),
                 };
 
                 match write_temperature(temperature, conn) {
-                    Ok(_) => format!("Recorded temperature: {}bpm", temperature),
+                    Ok(_) => format!("Recorded temperature: {}°C", temperature),
                     Err(err) => format!("Failed to write temperature data\n{}", err),
                 }
             }
@@ -122,11 +122,11 @@ impl Stat for Temperature {
     }
 
     fn help() -> String {
-        String::from("\ttemperature <last <count:i64> | temperature:u8>\n")
+        String::from("\ttemperature <last <count:i64> | temperature:f32>\n")
     }
 }
 
-pub fn write_temperature(value: u8, conn: &Connection) -> Result<usize, Box<dyn Error>> {
+pub fn write_temperature(value: f32, conn: &Connection) -> Result<usize, Box<dyn Error>> {
     let timestamp = Utc::now().timestamp();
     Ok(conn.execute(
         "INSERT INTO temperature (timestamp, temperature) VALUES (?1, ?2);",
@@ -184,7 +184,7 @@ fn last(input: &mut SplitWhitespace, conn: &Connection) -> String {
             for result in results {
                 let result = result.unwrap();
                 output.push_str(&format!(
-                    "{}bpm ({}s), recorded {}\n",
+                    "{}°C ({:.1}s), recorded {}\n",
                     result.temperature,
                     result.duration,
                     utils::format_timestamp(result.timestamp)
