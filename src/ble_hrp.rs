@@ -30,6 +30,7 @@ pub async fn record_hrp_device(mac: &str, conn: &Connection) {
         }
     };
 
+    info!("Discovering services");
     match device.discover_services().await {
         Ok(_) => info!("Discovered services for {}", mac),
         Err(err) => {
