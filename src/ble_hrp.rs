@@ -1,5 +1,9 @@
 use futures::StreamExt;
-use std::{error::Error, time::Duration};
+use std::{
+    error::Error,
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 
 use btleplug::{
     api::{BDAddr, Central, Manager as _, Peripheral, ScanFilter},
@@ -8,7 +12,22 @@ use btleplug::{
 use log::{error, info};
 use rusqlite::Connection;
 
-use crate::heartrate::{self};
+use crate::{
+    heartrate::{self},
+    utils, SectionedConfigMap,
+};
+
+pub async fn start(conf: Arc<RwLock<SectionedConfigMap>>, conn: &Connection) {
+    let mac = utils::from_config(conf, "ble_hrp", "hrp_mac");
+
+    if mac.is_err() {
+        return;
+    }
+
+    let mac = mac.unwrap();
+
+    record_hrp_device(&mac, conn).await;
+}
 
 pub async fn record_hrp_device(mac: &str, conn: &Connection) {
     let device = match identify_device(mac, scan().await).await {

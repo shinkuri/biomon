@@ -2,7 +2,16 @@ use bp::BP;
 use chrono::{TimeZone, Utc};
 use fern::Dispatch;
 use heartrate::Heartrate;
-use std::{fs, io, str::SplitWhitespace, time::Duration};
+use ini::configparser::ini::Ini;
+use std::{
+    collections::HashMap,
+    fs::{self, OpenOptions},
+    io,
+    path::Path,
+    str::SplitWhitespace,
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 use temperature::Temperature;
 
 use log::{error, info};
@@ -24,9 +33,21 @@ pub trait Stat {
     fn help() -> String;
 }
 
+type SectionedConfigMap = HashMap<String, HashMap<String, Option<String>>>;
+
 #[tokio::main]
 async fn main() {
     setup_logger().expect("Failed to setup logger");
+
+    let conf = match read_config("biomon.ini") {
+        Ok(conf) => conf,
+        Err(err) => {
+            error!("Failed to read config -> {}", err);
+            return;
+        }
+    };
+    let conf = Arc::from(RwLock::from(conf));
+
     info!("Biomon launched");
 
     let conn = match Connection::open("biomon.sqlite") {
@@ -74,6 +95,7 @@ async fn main() {
                 return;
             }
         };
+
         // Match against the input string
         match command {
             "help" => println!("{}", help()),
@@ -82,7 +104,7 @@ async fn main() {
             "mood" => println!("{}", Mood::command(&mut input, &conn)),
             "heartrate" => println!("{}", Heartrate::command(&mut input, &conn)),
             "temp" => println!("{}", Temperature::command(&mut input, &conn)),
-            "record_hrp" => ble_hrp::record_hrp_device("", &conn).await,
+            "record_hrp" => ble_hrp::start(conf.clone(), &conn).await,
             "ingest_markdown_weight" => ingest_markdown_weight(&mut input, &conn),
             "backup" => println!("{}", backup(&mut input, &conn)),
             "restore" => println!("{}", restore(&mut input)),
@@ -91,6 +113,11 @@ async fn main() {
             _ => println!("Unknown command: {}", command),
         }
     }
+
+    match write_config("biomon.ini", conf) {
+        Ok(_) => info!("Config saved"),
+        Err(err) => error!("Failed to save config -> {}", err),
+    };
 }
 
 fn help() -> String {
@@ -257,6 +284,59 @@ fn restore(input: &mut SplitWhitespace) -> String {
     };
 
     output
+}
+
+fn read_config(path: &str) -> Result<SectionedConfigMap, String> {
+    if !Path::new(path).exists() {
+        match OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(path)
+        {
+            Ok(_) => info!("Missing file create: biomon.ini"),
+            Err(err) => {
+                error!("Failed to create missing file: biomon.ini -> {}", err);
+                return Err(err.to_string());
+            }
+        }
+    }
+
+    let mut ini = Ini::new();
+    ini.load(path)
+}
+
+fn write_config(path: &str, conf: Arc<RwLock<SectionedConfigMap>>) -> Result<(), io::Error> {
+    let mut ini = Ini::new();
+
+    set_with_default(&mut ini, conf, "ble_hrp", "hrp_mac", None);
+
+    ini.write(path)
+}
+
+fn set_with_default(
+    ini: &mut Ini,
+    conf: Arc<RwLock<SectionedConfigMap>>,
+    section: &str,
+    key: &str,
+    default: Option<String>,
+) {
+    let conf = match conf.read() {
+        Ok(conf) => conf,
+        Err(err) => {
+            error!("Failed to aquire lock for config map -> {}", err);
+            return;
+        }
+    };
+    let value = match conf.get(section) {
+        Some(secmap) => match secmap.get(key) {
+            Some(v) => v.clone().or(default),
+            None => default,
+        },
+        None => default,
+    };
+    
+    ini.set(section, key, value);
 }
 
 fn ingest_markdown_weight(input: &mut SplitWhitespace, conn: &Connection) {
