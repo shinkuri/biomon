@@ -309,7 +309,13 @@ fn read_config(path: &str) -> Result<SectionedConfigMap, String> {
 fn write_config(path: &str, conf: Arc<RwLock<SectionedConfigMap>>) -> Result<(), io::Error> {
     let mut ini = Ini::new();
 
-    set_with_default(&mut ini, conf, "ble_hrp", "hrp_mac", None);
+    if let Err(err) = set_with_default(&mut ini, conf, "ble_hrp", "hrp_mac", None) {
+        error!(
+            "Failed to set config for section 'ble_hrp' and key 'hrp_mac' -> {}",
+            err
+        );
+        return Err(err);
+    }
 
     ini.write(path)
 }
@@ -320,23 +326,22 @@ fn set_with_default(
     section: &str,
     key: &str,
     default: Option<String>,
-) {
-    let conf = match conf.read() {
-        Ok(conf) => conf,
-        Err(err) => {
-            error!("Failed to aquire lock for config map -> {}", err);
-            return;
-        }
-    };
-    let value = match conf.get(section) {
-        Some(secmap) => match secmap.get(key) {
-            Some(v) => v.clone().or(default),
-            None => default,
-        },
-        None => default,
-    };
-    
+) -> Result<(), io::Error> {
+    let conf = conf.read().map_err(|err| {
+        io::Error::new(
+            io::ErrorKind::Other,
+            format!("Failed to aquire lock on config map -> {}", err),
+        )
+    })?;
+
+    let value = conf
+        .get(section)
+        .and_then(|secmap| secmap.get(key))
+        .and_then(|v| v.as_ref())
+        .map_or(default.clone(), |v| Some(v.clone()));
+
     ini.set(section, key, value);
+    Ok(())
 }
 
 fn ingest_markdown_weight(input: &mut SplitWhitespace, conn: &Connection) {
